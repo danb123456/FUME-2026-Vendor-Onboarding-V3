@@ -262,7 +262,7 @@ const App: React.FC = () => {
           <div className="p-8 space-y-8">
             <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl mb-4">
               <p className="text-xs font-bold text-gray-600 uppercase tracking-wider leading-relaxed">
-                Provide dimensions and structure details. External space must be justified and used for functional equipment only.
+                Provide dimensions, structure - NO GAZEBO's, and branding assets (logo, etc). 2.3m L/R and 2m Behind is included in pitch fee. £100 for every additional m requested.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
