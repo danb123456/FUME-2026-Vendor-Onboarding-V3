@@ -422,7 +422,7 @@ const App: React.FC = () => {
             <FormField label="Vehicle Registration Number" value={formData.vehicleReg} onChange={(v) => setFormData({...formData, vehicleReg: v})} required />
             <FormField label="Instagram Handle" value={formData.instagram} onChange={(v) => setFormData({...formData, instagram: v})} placeholder="@handle" />
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Questions / Comments</label>
+              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Questions / Comments *MUST INCLUDE ACCOMMODATION ADDRESS HERE*</label>
               <textarea rows={3} className="w-full px-4 py-3 border border-gray-300 rounded-2xl outline-none font-medium focus:ring-2 focus:ring-orange-500" value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})} />
             </div>
           </div>
