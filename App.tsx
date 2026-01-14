@@ -23,7 +23,7 @@ import FormField from './components/FormField';
 import FileInput from './components/FileInput';
 
 // REPLACE THIS WITH YOUR NEW DEPLOYMENT URL
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8QyE7cmB3_58PalUOMccYXyAm3bPJfZXDJqbjf_GaGD0XmKqTHkqJN9IlvKpdYc0/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAepbh5GuZmV-OaGWS1L1ZHiNScYRQobKhy0M0RXW09uleqqsaRGgG4omNZRYiDvE/exec';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
