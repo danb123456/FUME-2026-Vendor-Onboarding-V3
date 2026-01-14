@@ -22,8 +22,8 @@ import SectionHeader from './components/SectionHeader';
 import FormField from './components/FormField';
 import FileInput from './components/FileInput';
 
-// IMPORTANT: Ensure this URL matches your LATEST deployment in Google Apps Script
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwapF5J1i1b9c-jtCvd6D91hVOoEoPJAV96y1HXK6Q2qaQuG81FXSET0mUxIbhi40A/exec';
+// REPLACE THIS WITH YOUR NEW DEPLOYMENT URL
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyp3n-JDqY0oaTFIMxEiuZ63y5v4OsGjF4sDut02o8XZXfsMe6iU2L_RITKDlLTx2Q/exec';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -31,7 +31,7 @@ const App: React.FC = () => {
   const [authError, setAuthError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [isDraftSaved, setIsDraftSaved] = useState(false);
+  const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
 
   const initialFormData: VendorFormData = {
     vendorId: '',
@@ -66,56 +66,19 @@ const App: React.FC = () => {
 
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('fume_vendor_draft');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setFormData(prev => ({ ...prev, ...parsed }));
-      } catch (e) {
-        console.error("Failed to parse draft", e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const { branding, paperwork, menu, ...serializable } = formData;
-    localStorage.setItem('fume_vendor_draft', JSON.stringify(serializable));
-  }, [formData]);
-
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === 'FUME2026') {
       setIsAuthenticated(true);
-      setAuthError('');
     } else {
       setAuthError('Incorrect password.');
     }
   };
 
-  const addEquipment = () => {
-    const newItem: EquipmentItem = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: EQUIPMENT_TYPES[0],
-      socket: POWER_SOCKETS[0]
-    };
-    setFormData(prev => ({ ...prev, equipment: [...prev.equipment, newItem] }));
-  };
-
-  const removeEquipment = (id: string) => {
-    setFormData(prev => ({ ...prev, equipment: prev.equipment.filter(item => item.id !== id) }));
-  };
-
-  const addStaff = () => {
-    const newStaff: StaffMember = {
-      id: Math.random().toString(36).substr(2, 9),
-      role: STAFF_ROLES[0]
-    };
-    setFormData(prev => ({ ...prev, staff: [...prev.staff, newStaff] }));
-  };
-
-  const removeStaff = (id: string) => {
-    setFormData(prev => ({ ...prev, staff: prev.staff.filter(s => s.id !== id) }));
+  const toggleReason = (reason: string) => {
+    setSelectedReasons(prev => 
+      prev.includes(reason) ? prev.filter(r => r !== reason) : [...prev, reason]
+    );
   };
 
   const validateExpiry = (date: string) => {
@@ -127,11 +90,8 @@ const App: React.FC = () => {
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const base64String = (reader.result as string).split(',')[1];
-        resolve(base64String);
-      };
-      reader.onerror = error => reject(error);
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   };
@@ -144,13 +104,8 @@ const App: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    
     try {
-      const equipmentString = formData.equipment
-        .map(e => `${e.type} (${e.socket})`)
-        .join(', ');
-
-      // MAPPING PAYLOAD TO MATCH APPS SCRIPT EXPECTATIONS
+      // Create detailed concatenations for the sheet
       const payload: any = { 
         vendorId: formData.vendorId,
         tradingName: formData.tradingName,
@@ -162,119 +117,121 @@ const App: React.FC = () => {
         spaceLeft: formData.spaceLeft,
         spaceRight: formData.spaceRight,
         spaceBehind: formData.spaceBehind,
-        externalSpaceReason: formData.externalSpaceReason,
+        externalSpaceReason: selectedReasons.join(', '), // Column K
         powerSource: formData.powerSource,
-        equipment: equipmentString,
-        paperworkStatus: formData.paperworkStatus,
+        equipment: formData.equipment.map(e => `${e.type} (${e.socket})`).join(', '), // Column M
+        paperworkStatus: formData.paperworkStatus, // Column AG
+        staffRoles: formData.staff.map(s => s.role).join(', '), // Column AH
+        expiryDates: PAPERWORK_ITEMS.map(item => `${item.label}: ${formData.paperwork[item.id].expiry || 'N/A'}`).join(' | '), // Column AI
+        menuDesc3: `${formData.menu.dish3.desc} (${formData.menu.dish3.ingredients})`,
+        menuDesc75: `${formData.menu.dish75.desc} (${formData.menu.dish75.ingredients})`,
+        menuDesc15: `${formData.menu.dish15.desc} (${formData.menu.dish15.ingredients})`,
         vehicleReg: formData.vehicleReg,
         instagram: formData.instagram,
         comments: formData.comments,
-        staff: formData.staff // Array for script to check .length
+        staff: formData.staff // Passed for count in script
       };
 
-      // Handle Paperwork Files
+      // 1. Handle Branding File
+      if (formData.branding) {
+        payload.fileData_branding = await fileToBase64(formData.branding);
+        payload.fileName_branding = formData.branding.name;
+      }
+
+      // 2. Handle Paperwork Files
       for (const id of Object.keys(formData.paperwork)) {
-        const item = formData.paperwork[id];
-        if (item.file) {
-          payload[`fileData_${id}`] = await fileToBase64(item.file);
-          payload[`fileName_${id}`] = item.file.name;
+        if (formData.paperwork[id].file) {
+          payload[`fileData_${id}`] = await fileToBase64(formData.paperwork[id].file!);
+          payload[`fileName_${id}`] = formData.paperwork[id].file!.name;
         }
       }
 
-      // Handle Menu Descriptions (Matching row[24], row[25], row[26] logic)
-      payload.menuDesc3 = `${formData.menu.dish3.desc} [Ingredients: ${formData.menu.dish3.ingredients}]`;
-      payload.menuDesc75 = `${formData.menu.dish75.desc} [Ingredients: ${formData.menu.dish75.ingredients}]`;
-      payload.menuDesc15 = `${formData.menu.dish15.desc} [Ingredients: ${formData.menu.dish15.ingredients}]`;
-
-      // Optional: Handle Menu Photos if your script supports them
-      if (formData.menu.dish3.photo) {
-        payload.fileData_menu3 = await fileToBase64(formData.menu.dish3.photo);
-        payload.fileName_menu3 = formData.menu.dish3.photo.name;
+      // 3. Handle Menu Files
+      const dishKeys = ['dish3', 'dish75', 'dish15'] as const;
+      for (const key of dishKeys) {
+        if (formData.menu[key].photo) {
+          const suffix = key.replace('dish', '');
+          payload[`fileData_menu${suffix}`] = await fileToBase64(formData.menu[key].photo!);
+          payload[`fileName_menu${suffix}`] = formData.menu[key].photo!.name;
+        }
       }
 
       await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      localStorage.removeItem('fume_vendor_draft');
       setSubmitSuccess(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo(0, 0);
     } catch (err) {
-      console.error("Submission Error:", err);
-      alert("Submission error. Your data is saved locally.");
+      alert("Submission error. Progress saved locally. Try again later.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen gradient-bg p-6">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-black text-gray-800 tracking-tighter uppercase italic">FUME 2026</h1>
-            <p className="text-gray-500 mt-2 font-medium">Vendor Portal</p>
-          </div>
-          <form onSubmit={handleAuth} className="space-y-4">
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 outline-none" placeholder="Password: FUME2026" required />
-            {authError && <p className="text-red-500 text-sm font-bold text-center">{authError}</p>}
-            <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-lg shadow-lg uppercase tracking-widest">Login</button>
-          </form>
-        </div>
+  if (!isAuthenticated) return (
+    <div className="flex items-center justify-center min-h-screen gradient-bg p-6">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <h1 className="text-3xl font-black text-gray-800 text-center mb-8 uppercase italic tracking-tighter">FUME 2026</h1>
+        <form onSubmit={handleAuth} className="space-y-4">
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-orange-500" placeholder="Password: FUME2026" required />
+          {authError && <p className="text-red-500 text-sm font-bold text-center">{authError}</p>}
+          <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-lg shadow-lg uppercase tracking-widest hover:bg-orange-700 transition-colors">Login</button>
+        </form>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (submitSuccess) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6 text-center">
-        <div className="bg-white p-10 rounded-3xl shadow-xl max-w-lg border border-gray-100">
-          <div className="text-green-500 text-6xl mb-6 font-bold">✓</div>
-          <h2 className="text-3xl font-black mb-4 uppercase italic">DATA SYNCED</h2>
-          <p className="text-gray-600 mb-8 font-medium">Record Updated for Vendor: <span className="text-orange-600 font-bold">{formData.vendorId}</span>.</p>
-          <button onClick={() => window.location.reload()} className="bg-orange-600 text-white font-black px-8 py-4 rounded-xl uppercase tracking-widest hover:bg-orange-700">New Onboarding</button>
-        </div>
+  if (submitSuccess) return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6 text-center">
+      <div className="bg-white p-10 rounded-3xl shadow-xl max-w-lg border border-gray-100">
+        <div className="text-green-500 text-6xl mb-6 font-bold">✓</div>
+        <h2 className="text-3xl font-black mb-4 uppercase italic tracking-tighter">APPLICATION SYNCED</h2>
+        <p className="text-gray-600 mb-8 font-medium italic">Data has been successfully pushed to the master sheet and Google Drive.</p>
+        <button onClick={() => window.location.reload()} className="bg-orange-600 text-white font-black px-8 py-4 rounded-xl uppercase hover:bg-orange-700 transition-transform active:scale-95">Submit New</button>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-4">
       <header className="mb-12 text-center">
         <h1 className="text-7xl font-black text-gray-900 tracking-tighter mb-2 italic uppercase">FUME 2026</h1>
-        <p className="text-lg text-gray-500 font-bold uppercase tracking-[0.3em]">Vendor Control Portal</p>
+        <p className="text-lg text-gray-500 font-bold uppercase tracking-[0.3em]">Vendor Portal</p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-10">
+        {/* Section 1 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 1: Vendor Details" />
           <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField label="Vendor ID" required helper="Matches your row on the master sheet" value={formData.vendorId} onChange={(v) => setFormData({...formData, vendorId: v})} />
+            <FormField label="Vendor ID" required value={formData.vendorId} onChange={(v) => setFormData({...formData, vendorId: v})} />
             <FormField label="Trading Name" required value={formData.tradingName} onChange={(v) => setFormData({...formData, tradingName: v})} />
             <FormField label="Contact Name" required value={formData.contactName} onChange={(v) => setFormData({...formData, contactName: v})} />
             <FormField label="Email" type="email" required value={formData.email} onChange={(v) => setFormData({...formData, email: v})} />
             <FormField label="Phone" required value={formData.phone} onChange={(v) => setFormData({...formData, phone: v})} />
             <div>
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase">Coming to State Fayre? *</label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-medium" value={formData.comingToStateFayre} onChange={(e) => setFormData({...formData, comingToStateFayre: e.target.value as any})} required>
+              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Coming to State Fayre? *</label>
+              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-orange-500" value={formData.comingToStateFayre} onChange={(e) => setFormData({...formData, comingToStateFayre: e.target.value as any})} required>
                 <option value="">Select option...</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
+                <option value="Need More Info">Need More Info</option>
               </select>
             </div>
           </div>
         </div>
 
+        {/* Section 2 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 2: Stand Design" />
           <div className="p-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-black text-gray-700 mb-2 uppercase">Van / Shack</label>
-                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium" value={formData.standType} onChange={(e) => setFormData({...formData, standType: e.target.value as any})} required>
+                <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Van / Shack</label>
+                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-orange-500" value={formData.standType} onChange={(e) => setFormData({...formData, standType: e.target.value as any})} required>
                   <option value="">Select...</option>
                   <option value="Van">Van</option>
                   <option value="Shack">Shack</option>
@@ -284,18 +241,18 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {['spaceLeft', 'spaceRight', 'spaceBehind'].map((field) => (
                 <div key={field}>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">{field === 'spaceLeft' ? 'Left' : field === 'spaceRight' ? 'Right' : 'Behind'}</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-medium" value={(formData as any)[field]} onChange={(e) => setFormData({...formData, [field]: e.target.value})}>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">{field.replace('space', 'Space ')}</label>
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-orange-500" value={(formData as any)[field]} onChange={(e) => setFormData({...formData, [field]: e.target.value})}>
                     {SPACE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
               ))}
             </div>
             <div>
-              <label className="block text-sm font-black text-gray-700 mb-3 uppercase">Reason for External Space</label>
+              <label className="block text-sm font-black text-gray-700 mb-3 uppercase italic">Reason for External Space (Multi-select)</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {REASON_OPTIONS.map((opt) => (
-                  <button key={opt} type="button" onClick={() => setFormData({...formData, externalSpaceReason: opt as ExternalSpaceReason})} className={`px-4 py-3 rounded-xl border-2 font-black transition-all text-xs uppercase ${formData.externalSpaceReason === opt ? 'border-orange-600 bg-orange-600 text-white shadow-lg' : 'border-gray-200 bg-white text-gray-500'}`}>
+                  <button key={opt} type="button" onClick={() => toggleReason(opt)} className={`px-4 py-3 rounded-xl border-2 font-black transition-all text-xs uppercase ${selectedReasons.includes(opt) ? 'border-orange-600 bg-orange-600 text-white shadow-lg' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'}`}>
                     {opt}
                   </button>
                 ))}
@@ -305,12 +262,13 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 3 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 3: Equipment and Power" />
           <div className="p-8 space-y-6">
             <div>
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase">Power Source</label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium" value={formData.powerSource} onChange={(e) => setFormData({...formData, powerSource: e.target.value as any})} required>
+              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Power Source</label>
+              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-orange-500" value={formData.powerSource} onChange={(e) => setFormData({...formData, powerSource: e.target.value as any})} required>
                 <option value="">Select...</option>
                 <option value="FUME/Venue Supply">FUME/Venue Supply</option>
                 <option value="Own Generator">Own Generator</option>
@@ -319,26 +277,18 @@ const App: React.FC = () => {
             <div className="pt-6 border-t border-gray-100">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-black text-gray-800 uppercase italic">Stand Equipment</h3>
-                <button type="button" onClick={addEquipment} className="bg-orange-600 text-white text-[10px] font-black px-5 py-2 rounded-full uppercase shadow-lg">+ Add Equipment</button>
+                <button type="button" onClick={() => setFormData({...formData, equipment: [...formData.equipment, {id: Math.random().toString(36).substr(2, 9), type: EQUIPMENT_TYPES[0], socket: POWER_SOCKETS[0]}]})} className="bg-orange-600 text-white text-[10px] font-black px-5 py-2 rounded-full shadow-lg hover:scale-105 transition-transform">+ Add Item</button>
               </div>
               <div className="space-y-3">
                 {formData.equipment.map((item, index) => (
                   <div key={item.id} className="flex gap-4 items-end bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                    <div className="flex-1">
-                      <select className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none bg-white font-bold text-sm" value={item.type} onChange={(e) => {
-                        const newList = [...formData.equipment]; newList[index].type = e.target.value; setFormData({...formData, equipment: newList});
-                      }}>
-                        {EQUIPMENT_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-                      </select>
-                    </div>
-                    <div className="flex-1">
-                      <select className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none bg-white font-bold text-sm" value={item.socket} onChange={(e) => {
-                        const newList = [...formData.equipment]; newList[index].socket = e.target.value; setFormData({...formData, equipment: newList});
-                      }}>
-                        {POWER_SOCKETS.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <button type="button" onClick={() => removeEquipment(item.id)} className="p-2 text-red-500">✕</button>
+                    <select className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold text-sm outline-none" value={item.type} onChange={(e) => {
+                      const newList = [...formData.equipment]; newList[index].type = e.target.value; setFormData({...formData, equipment: newList});
+                    }}>{EQUIPMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                    <select className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white font-bold text-sm outline-none" value={item.socket} onChange={(e) => {
+                      const newList = [...formData.equipment]; newList[index].socket = e.target.value; setFormData({...formData, equipment: newList});
+                    }}>{POWER_SOCKETS.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <button type="button" onClick={() => setFormData({...formData, equipment: formData.equipment.filter(e => e.id !== item.id)})} className="p-2 text-red-500 hover:scale-125 transition-transform">✕</button>
                   </div>
                 ))}
               </div>
@@ -346,11 +296,13 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 4 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 4: Paperwork" />
           <div className="p-8 space-y-8">
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-xl text-blue-800">
-              <p className="text-xs font-black uppercase tracking-widest leading-relaxed">Deadline: 14th Feb 2026. Docs must be valid until June 14th 2026.</p>
+            <div className={`p-4 rounded-xl font-black text-xs uppercase tracking-widest leading-relaxed shadow-inner ${formData.comingToStateFayre === 'Yes' ? 'bg-orange-50 text-orange-800 border-l-4 border-orange-500' : 'bg-blue-50 text-blue-800 border-l-4 border-blue-500'}`}>
+              REQUIRED UNTIL: {formData.comingToStateFayre === 'Yes' ? '1st July 2026' : '14th June 2026'}. <br/>
+              Deadline: 14th Feb 2026. Designed for Allianz Stadium.
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
               {PAPERWORK_ITEMS.map((item) => (
@@ -359,8 +311,8 @@ const App: React.FC = () => {
                     const newPaperwork = { ...formData.paperwork }; newPaperwork[item.id].file = f; setFormData({...formData, paperwork: newPaperwork});
                   }} />
                   <div className="flex flex-col">
-                    <label className="text-[10px] uppercase font-black text-gray-400 mb-1 tracking-widest">Expiration</label>
-                    <input type="date" className={`w-full px-3 py-2 border rounded-lg font-bold ${formData.paperwork[item.id].expiry && !validateExpiry(formData.paperwork[item.id].expiry) ? 'border-red-500' : 'border-gray-300'}`} value={formData.paperwork[item.id].expiry} onChange={(e) => {
+                    <label className="text-[10px] uppercase font-black text-gray-400 mb-1 tracking-widest">Expiration Date</label>
+                    <input type="date" className={`w-full px-3 py-2 border rounded-lg font-bold text-sm outline-none ${formData.paperwork[item.id].expiry && !validateExpiry(formData.paperwork[item.id].expiry) ? 'border-red-500 bg-red-50' : 'border-gray-300 focus:border-orange-500'}`} value={formData.paperwork[item.id].expiry} onChange={(e) => {
                         const newPaperwork = { ...formData.paperwork }; newPaperwork[item.id].expiry = e.target.value; setFormData({...formData, paperwork: newPaperwork});
                       }} />
                   </div>
@@ -368,8 +320,8 @@ const App: React.FC = () => {
               ))}
             </div>
             <div className="pt-6 border-t border-gray-100">
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase">Status of Finish?</label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium" value={formData.paperworkStatus} onChange={(e) => setFormData({...formData, paperworkStatus: e.target.value as any})} required>
+              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Paperwork Finished?</label>
+              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium focus:ring-2 focus:ring-orange-500" value={formData.paperworkStatus} onChange={(e) => setFormData({...formData, paperworkStatus: e.target.value as any})} required>
                 <option value="">Select...</option>
                 <option value="Yes">Yes</option>
                 <option value="Yes but need to renew documents">Yes but need to renew documents</option>
@@ -379,6 +331,7 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 5 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 5: Menu" />
           <div className="p-8 space-y-10">
@@ -389,17 +342,14 @@ const App: React.FC = () => {
             ].map((d) => (
               <div key={d.key} className="menu-card grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-gray-50 rounded-2xl border border-gray-200">
                 <div className="flex flex-col justify-center">
-                  <div className="text-5xl font-black text-orange-600 mb-1 italic">{d.price}</div>
+                  <div className="text-5xl font-black text-orange-600 italic tracking-tighter">{d.price}</div>
                   <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{d.label} Item</div>
                 </div>
                 <div className="md:col-span-2 space-y-4">
-                  <FormField label="Item Description" value={(formData.menu as any)[d.key].desc} onChange={(v) => {
+                  <FormField label="Item & Ingredients" value={(formData.menu as any)[d.key].desc} onChange={(v) => {
                     const newMenu = { ...formData.menu }; (newMenu as any)[d.key].desc = v; setFormData({...formData, menu: newMenu});
-                  }} />
-                  <FormField label="Ingredients" value={(formData.menu as any)[d.key].ingredients} onChange={(v) => {
-                    const newMenu = { ...formData.menu }; (newMenu as any)[d.key].ingredients = v; setFormData({...formData, menu: newMenu});
-                  }} />
-                  <FileInput label="Photo Upload" accept="image/*" onChange={(f) => {
+                  }} placeholder="Describe dish and list all ingredients..." />
+                  <FileInput label="Dish Photo" accept="image/*" onChange={(f) => {
                     const newMenu = { ...formData.menu }; (newMenu as any)[d.key].photo = f; setFormData({...formData, menu: newMenu});
                   }} />
                 </div>
@@ -408,48 +358,52 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 6 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 6: Staffing" />
           <div className="p-8 space-y-6">
-            <div className="bg-gray-950 text-white p-5 rounded-2xl text-[10px] uppercase font-black tracking-widest text-center italic">Min 6 staff required.</div>
+            <div className="bg-black text-white p-5 rounded-xl text-[10px] uppercase font-black text-center italic tracking-widest leading-relaxed">
+              FUME Festival requires at least 6 staff working on your stand during the live show to maximise speed and quality of service. Failure to meet this will result in a breach of contracts and fines.
+            </div>
             <div className="flex justify-between items-center">
-              <h3 className="font-black text-gray-800 uppercase italic">Staff Allocation ({formData.staff.length}/6)</h3>
-              <button type="button" onClick={addStaff} className="bg-black text-white text-[10px] font-black px-6 py-2.5 rounded-full uppercase hover:scale-105 transition-transform">+ Add Staff</button>
+              <h3 className="font-black text-gray-800 uppercase italic">Staff List ({formData.staff.length}/6)</h3>
+              <button type="button" onClick={() => setFormData({...formData, staff: [...formData.staff, {id: Math.random().toString(36).substr(2, 9), role: STAFF_ROLES[0]}]})} className="bg-orange-600 text-white text-[10px] font-black px-6 py-2.5 rounded-full shadow-lg hover:scale-105 transition-all">+ Add Staff</button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {formData.staff.map((s, index) => (
                 <div key={s.id} className="flex gap-4 items-center bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                  <span className="text-[10px] font-black text-gray-400">#{index+1}</span>
-                  <select className="flex-1 bg-transparent text-xs font-black uppercase focus:outline-none" value={s.role} onChange={(e) => {
+                  <span className="text-[10px] font-black text-gray-400">Staff {index+1}</span>
+                  <select className="flex-1 bg-transparent text-xs font-black uppercase outline-none focus:text-orange-600" value={s.role} onChange={(e) => {
                     const newStaff = [...formData.staff]; newStaff[index].role = e.target.value; setFormData({...formData, staff: newStaff});
-                  }}>
-                    {STAFF_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
-                  </select>
-                  <button type="button" onClick={() => removeStaff(s.id)} className="text-red-500">✕</button>
+                  }}>{STAFF_ROLES.map(role => <option key={role} value={role}>{role}</option>)}</select>
+                  <button type="button" onClick={() => setFormData({...formData, staff: formData.staff.filter(st => st.id !== s.id)})} className="text-red-500 hover:scale-125 transition-all">✕</button>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
+        {/* Section 7 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 7: Final Details" />
           <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField label="Vehicle Reg Number" value={formData.vehicleReg} onChange={(v) => setFormData({...formData, vehicleReg: v})} required />
-            <FormField label="Instagram Handle" value={formData.instagram} onChange={(v) => setFormData({...formData, instagram: v})} />
+            <FormField label="Vehicle Registration Number" value={formData.vehicleReg} onChange={(v) => setFormData({...formData, vehicleReg: v})} required />
+            <FormField label="Instagram Handle" value={formData.instagram} onChange={(v) => setFormData({...formData, instagram: v})} placeholder="@handle" />
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase">Comments</label>
-              <textarea rows={3} className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-orange-500 outline-none font-medium" value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})} />
+              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Questions / Comments</label>
+              <textarea rows={3} className="w-full px-4 py-3 border border-gray-300 rounded-2xl outline-none font-medium focus:ring-2 focus:ring-orange-500" value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})} />
             </div>
           </div>
         </div>
 
-        <div className="space-y-4 pt-6">
-          <button type="submit" disabled={isSubmitting || formData.staff.length < MIN_STAFF_COUNT} className={`w-full py-8 rounded-[40px] text-3xl font-black text-white shadow-2xl transition-all uppercase tracking-tighter italic ${isSubmitting || formData.staff.length < MIN_STAFF_COUNT ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 active:scale-[0.98]'}`}>
-            {isSubmitting ? 'SYNCING...' : 'FINISH ONBOARDING'}
-          </button>
-        </div>
+        <button type="submit" disabled={isSubmitting || formData.staff.length < 6} className={`w-full py-8 rounded-[40px] text-3xl font-black text-white shadow-2xl transition-all uppercase italic tracking-tighter ${isSubmitting || formData.staff.length < 6 ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 active:scale-95'}`}>
+          {isSubmitting ? 'UPLOADING DATA...' : 'FINISH ONBOARDING'}
+        </button>
       </form>
+      
+      <footer className="mt-12 text-center text-[10px] font-black uppercase text-gray-400 italic tracking-[0.5em] pb-12">
+        &copy; 2026 FUME Festival Allianz Stadium
+      </footer>
     </div>
   );
 };
