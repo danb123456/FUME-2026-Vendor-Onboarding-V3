@@ -337,7 +337,7 @@ const App: React.FC = () => {
           <div className="p-8 space-y-8">
             <div className={`p-4 rounded-xl font-black text-xs uppercase tracking-widest leading-relaxed shadow-inner ${formData.comingToStateFayre === 'Yes' ? 'bg-orange-50 text-orange-800 border-l-4 border-orange-500' : 'bg-blue-50 text-blue-800 border-l-4 border-blue-500'}`}>
               REQUIRED UNTIL: {formData.comingToStateFayre === 'Yes' ? '1st July 2026' : '14th June 2026'}. <br/>
-              Deadline: 14th Feb 2026. Designed for Allianz Stadium.
+              Deadline: 14th Feb 2026. Documents must be designed for Allianz Stadium/State Fayre for relevant dates.
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
               {PAPERWORK_ITEMS.map((item) => (
