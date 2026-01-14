@@ -262,7 +262,7 @@ const App: React.FC = () => {
           <div className="p-8 space-y-8">
             <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl mb-4">
               <p className="text-xs font-bold text-gray-600 uppercase tracking-wider leading-relaxed">
-                Provide dimensions, structure - NO GAZEBO's, and branding assets (logo, etc). 2.3m L/R and 2m Behind is included in pitch fee. £100 for every additional m requested.
+                Provide dimensions, structure details *NO GAZEBO's*, and branding assets. 2.3m L/R and 2m behind stand inc in pitch fee - £100 for every additional metre.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -337,7 +337,7 @@ const App: React.FC = () => {
           <div className="p-8 space-y-8">
             <div className={`p-4 rounded-xl font-black text-xs uppercase tracking-widest leading-relaxed shadow-inner ${formData.comingToStateFayre === 'Yes' ? 'bg-orange-50 text-orange-800 border-l-4 border-orange-500' : 'bg-blue-50 text-blue-800 border-l-4 border-blue-500'}`}>
               REQUIRED UNTIL: {formData.comingToStateFayre === 'Yes' ? '1st July 2026' : '14th June 2026'}. <br/>
-              Deadline: 14th Feb 2026. Documents must be designed for Allianz Stadium/State Fayre for relevant dates.
+              Deadline: 14th Feb 2026. Docs must be designed for Allianz Stadium/State Fayre.
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
               {PAPERWORK_ITEMS.map((item) => (
@@ -422,7 +422,7 @@ const App: React.FC = () => {
             <FormField label="Vehicle Registration Number" value={formData.vehicleReg} onChange={(v) => setFormData({...formData, vehicleReg: v})} required />
             <FormField label="Instagram Handle" value={formData.instagram} onChange={(v) => setFormData({...formData, instagram: v})} placeholder="@handle" />
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Questions / Comments *MUST INCLUDE ACCOMMODATION ADDRESS HERE*</label>
+              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Questions / Comments *Must State Address for Live Days*</label>
               <textarea rows={3} className="w-full px-4 py-3 border border-gray-300 rounded-2xl outline-none font-medium focus:ring-2 focus:ring-orange-500" value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})} />
             </div>
           </div>
