@@ -23,7 +23,7 @@ import FormField from './components/FormField';
 import FileInput from './components/FileInput';
 
 // REPLACE THIS WITH YOUR NEW DEPLOYMENT URL
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyp3n-JDqY0oaTFIMxEiuZ63y5v4OsGjF4sDut02o8XZXfsMe6iU2L_RITKDlLTx2Q/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8QyE7cmB3_58PalUOMccYXyAm3bPJfZXDJqbjf_GaGD0XmKqTHkqJN9IlvKpdYc0/exec';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -66,6 +66,43 @@ const App: React.FC = () => {
 
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
 
+  // Load draft on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('fume_vendor_draft');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // We restore everything except files which can't be serialized to string easily this way
+        setFormData(prev => ({ ...prev, ...parsed }));
+        if (parsed.externalSpaceReason) {
+          setSelectedReasons(parsed.externalSpaceReason.split(', '));
+        }
+      } catch (e) {
+        console.error("Failed to load draft", e);
+      }
+    }
+  }, []);
+
+  // Save draft on change (de-duplicate file objects for serialization)
+  useEffect(() => {
+    const { branding, paperwork, menu, ...serializable } = formData;
+    const saveObj = {
+      ...serializable,
+      externalSpaceReason: selectedReasons.join(', '),
+      // Store dates but null out files in the saved state
+      paperwork: Object.keys(paperwork).reduce((acc, key) => {
+        acc[key] = { ...paperwork[key], file: null };
+        return acc;
+      }, {} as any),
+      menu: {
+        dish3: { ...menu.dish3, photo: null },
+        dish75: { ...menu.dish75, photo: null },
+        dish15: { ...menu.dish15, photo: null }
+      }
+    };
+    localStorage.setItem('fume_vendor_draft', JSON.stringify(saveObj));
+  }, [formData, selectedReasons]);
+
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === 'FUME2026') {
@@ -105,7 +142,6 @@ const App: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Create detailed concatenations for the sheet
       const payload: any = { 
         vendorId: formData.vendorId,
         tradingName: formData.tradingName,
@@ -117,28 +153,26 @@ const App: React.FC = () => {
         spaceLeft: formData.spaceLeft,
         spaceRight: formData.spaceRight,
         spaceBehind: formData.spaceBehind,
-        externalSpaceReason: selectedReasons.join(', '), // Column K
+        externalSpaceReason: selectedReasons.join(', '), 
         powerSource: formData.powerSource,
-        equipment: formData.equipment.map(e => `${e.type} (${e.socket})`).join(', '), // Column M
-        paperworkStatus: formData.paperworkStatus, // Column AG
-        staffRoles: formData.staff.map(s => s.role).join(', '), // Column AH
-        expiryDates: PAPERWORK_ITEMS.map(item => `${item.label}: ${formData.paperwork[item.id].expiry || 'N/A'}`).join(' | '), // Column AI
+        equipment: formData.equipment.map(e => `${e.type} (${e.socket})`).join(', '), 
+        paperworkStatus: formData.paperworkStatus, 
+        staffRoles: formData.staff.map(s => s.role).join(', '), 
+        expiryDates: PAPERWORK_ITEMS.map(item => `${item.label}: ${formData.paperwork[item.id].expiry || 'N/A'}`).join(' | '), 
         menuDesc3: `${formData.menu.dish3.desc} (${formData.menu.dish3.ingredients})`,
         menuDesc75: `${formData.menu.dish75.desc} (${formData.menu.dish75.ingredients})`,
         menuDesc15: `${formData.menu.dish15.desc} (${formData.menu.dish15.ingredients})`,
         vehicleReg: formData.vehicleReg,
         instagram: formData.instagram,
         comments: formData.comments,
-        staff: formData.staff // Passed for count in script
+        staff: formData.staff 
       };
 
-      // 1. Handle Branding File
       if (formData.branding) {
         payload.fileData_branding = await fileToBase64(formData.branding);
         payload.fileName_branding = formData.branding.name;
       }
 
-      // 2. Handle Paperwork Files
       for (const id of Object.keys(formData.paperwork)) {
         if (formData.paperwork[id].file) {
           payload[`fileData_${id}`] = await fileToBase64(formData.paperwork[id].file!);
@@ -146,7 +180,6 @@ const App: React.FC = () => {
         }
       }
 
-      // 3. Handle Menu Files
       const dishKeys = ['dish3', 'dish75', 'dish15'] as const;
       for (const key of dishKeys) {
         if (formData.menu[key].photo) {
@@ -162,6 +195,7 @@ const App: React.FC = () => {
         body: JSON.stringify(payload)
       });
 
+      localStorage.removeItem('fume_vendor_draft');
       setSubmitSuccess(true);
       window.scrollTo(0, 0);
     } catch (err) {
@@ -203,7 +237,6 @@ const App: React.FC = () => {
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-10">
-        {/* Section 1 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 1: Vendor Details" />
           <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -224,10 +257,14 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 2 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 2: Stand Design" />
           <div className="p-8 space-y-8">
+            <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl mb-4">
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider leading-relaxed">
+                Provide dimensions and structure details. External space must be justified and used for functional equipment only.
+              </p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Van / Shack</label>
@@ -262,7 +299,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 3 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 3: Equipment and Power" />
           <div className="p-8 space-y-6">
@@ -296,7 +332,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 4 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 4: Paperwork" />
           <div className="p-8 space-y-8">
@@ -331,7 +366,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 5 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 5: Menu" />
           <div className="p-8 space-y-10">
@@ -358,7 +392,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 6 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 6: Staffing" />
           <div className="p-8 space-y-6">
@@ -383,7 +416,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 7 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 7: Final Details" />
           <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
