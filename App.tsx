@@ -22,7 +22,8 @@ import SectionHeader from './components/SectionHeader';
 import FormField from './components/FormField';
 import FileInput from './components/FileInput';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzk7ia8CJ5xf0CieCr6hxTul1MZ1UzwJHycgNETkWI1Ywc8HiYAAllJrvmak2LG9Sk/exec';
+// IMPORTANT: Ensure this URL matches your LATEST deployment in Google Apps Script
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwapF5J1i1b9c-jtCvd6D91hVOoEoPJAV96y1HXK6Q2qaQuG81FXSET0mUxIbhi40A/exec';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -88,7 +89,7 @@ const App: React.FC = () => {
       setIsAuthenticated(true);
       setAuthError('');
     } else {
-      setAuthError('Incorrect password. Please try again.');
+      setAuthError('Incorrect password.');
     }
   };
 
@@ -126,19 +127,19 @@ const App: React.FC = () => {
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.readAsDataURL(file);
       reader.onload = () => {
         const base64String = (reader.result as string).split(',')[1];
         resolve(base64String);
       };
       reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.staff.length < MIN_STAFF_COUNT) {
-      alert(`FUME Festival requires at least ${MIN_STAFF_COUNT} staff members.`);
+      alert(`Min ${MIN_STAFF_COUNT} staff required.`);
       return;
     }
 
@@ -149,8 +150,8 @@ const App: React.FC = () => {
         .map(e => `${e.type} (${e.socket})`)
         .join(', ');
 
-      // ALIGNING TO YOUR GOOGLE APPS SCRIPT EXACTLY
-      const submissionPayload: any = { 
+      // MAPPING PAYLOAD TO MATCH APPS SCRIPT EXPECTATIONS
+      const payload: any = { 
         vendorId: formData.vendorId,
         tradingName: formData.tradingName,
         contactName: formData.contactName,
@@ -168,65 +169,45 @@ const App: React.FC = () => {
         vehicleReg: formData.vehicleReg,
         instagram: formData.instagram,
         comments: formData.comments,
-        staff: formData.staff // Passed as array for script .length check
+        staff: formData.staff // Array for script to check .length
       };
-      
-      // Branding upload logic if you choose to add a column for it later
-      if (formData.branding) {
-        submissionPayload.fileData_branding = await fileToBase64(formData.branding);
-        submissionPayload.fileName_branding = formData.branding.name;
-      }
-      
-      // Paperwork IDs match your script array: [risk_assessment, method_statement, etc.]
-      for (const key of Object.keys(formData.paperwork)) {
-        const item = formData.paperwork[key];
+
+      // Handle Paperwork Files
+      for (const id of Object.keys(formData.paperwork)) {
+        const item = formData.paperwork[id];
         if (item.file) {
-          submissionPayload[`fileData_${key}`] = await fileToBase64(item.file);
-          submissionPayload[`fileName_${key}`] = item.file.name;
+          payload[`fileData_${id}`] = await fileToBase64(item.file);
+          payload[`fileName_${id}`] = item.file.name;
         }
-        submissionPayload[`expiry_${key}`] = item.expiry;
       }
 
-      // Menu Logic matching your script: row[24]=menuDesc3, row[25]=menuDesc75, row[26]=menuDesc15
-      submissionPayload.menuDesc3 = `${formData.menu.dish3.desc} | Ingredients: ${formData.menu.dish3.ingredients}`;
-      submissionPayload.menuDesc75 = `${formData.menu.dish75.desc} | Ingredients: ${formData.menu.dish75.ingredients}`;
-      submissionPayload.menuDesc15 = `${formData.menu.dish15.desc} | Ingredients: ${formData.menu.dish15.ingredients}`;
+      // Handle Menu Descriptions (Matching row[24], row[25], row[26] logic)
+      payload.menuDesc3 = `${formData.menu.dish3.desc} [Ingredients: ${formData.menu.dish3.ingredients}]`;
+      payload.menuDesc75 = `${formData.menu.dish75.desc} [Ingredients: ${formData.menu.dish75.ingredients}]`;
+      payload.menuDesc15 = `${formData.menu.dish15.desc} [Ingredients: ${formData.menu.dish15.ingredients}]`;
 
-      // Photo handling for menu (matches fileName_ID pattern)
+      // Optional: Handle Menu Photos if your script supports them
       if (formData.menu.dish3.photo) {
-        submissionPayload.fileData_menu3 = await fileToBase64(formData.menu.dish3.photo);
-        submissionPayload.fileName_menu3 = formData.menu.dish3.photo.name;
-      }
-      if (formData.menu.dish75.photo) {
-        submissionPayload.fileData_menu75 = await fileToBase64(formData.menu.dish75.photo);
-        submissionPayload.fileName_menu75 = formData.menu.dish75.photo.name;
-      }
-      if (formData.menu.dish15.photo) {
-        submissionPayload.fileData_menu15 = await fileToBase64(formData.menu.dish15.photo);
-        submissionPayload.fileName_menu15 = formData.menu.dish15.photo.name;
+        payload.fileData_menu3 = await fileToBase64(formData.menu.dish3.photo);
+        payload.fileName_menu3 = formData.menu.dish3.photo.name;
       }
 
       await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submissionPayload)
+        body: JSON.stringify(payload)
       });
 
       localStorage.removeItem('fume_vendor_draft');
       setSubmitSuccess(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      console.error(err);
-      alert("Submission failed. Your progress is still saved in your browser.");
+      console.error("Submission Error:", err);
+      alert("Submission error. Your data is saved locally.");
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const saveManually = () => {
-    setIsDraftSaved(true);
-    setTimeout(() => setIsDraftSaved(false), 2000);
   };
 
   if (!isAuthenticated) {
@@ -235,21 +216,12 @@ const App: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-black text-gray-800 tracking-tighter uppercase italic">FUME 2026</h1>
-            <p className="text-gray-500 mt-2 font-medium">Vendor Portal Login</p>
+            <p className="text-gray-500 mt-2 font-medium">Vendor Portal</p>
           </div>
           <form onSubmit={handleAuth} className="space-y-4">
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 outline-none"
-              placeholder="Enter Password"
-              required
-            />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 outline-none" placeholder="Password: FUME2026" required />
             {authError && <p className="text-red-500 text-sm font-bold text-center">{authError}</p>}
-            <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black py-4 rounded-lg shadow-lg uppercase tracking-widest transition-all">
-              Login
-            </button>
+            <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-lg shadow-lg uppercase tracking-widest">Login</button>
           </form>
         </div>
       </div>
@@ -261,9 +233,9 @@ const App: React.FC = () => {
       <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6 text-center">
         <div className="bg-white p-10 rounded-3xl shadow-xl max-w-lg border border-gray-100">
           <div className="text-green-500 text-6xl mb-6 font-bold">✓</div>
-          <h2 className="text-3xl font-black mb-4 uppercase italic tracking-tighter tracking-tighter">DATA SYNCED</h2>
-          <p className="text-gray-600 mb-8 font-medium">Onboarding is complete for Vendor ID: <span className="text-orange-600 font-bold">{formData.vendorId}</span>.</p>
-          <button onClick={() => window.location.reload()} className="bg-orange-600 text-white font-black px-8 py-4 rounded-xl uppercase tracking-widest hover:bg-orange-700">Submit Another</button>
+          <h2 className="text-3xl font-black mb-4 uppercase italic">DATA SYNCED</h2>
+          <p className="text-gray-600 mb-8 font-medium">Record Updated for Vendor: <span className="text-orange-600 font-bold">{formData.vendorId}</span>.</p>
+          <button onClick={() => window.location.reload()} className="bg-orange-600 text-white font-black px-8 py-4 rounded-xl uppercase tracking-widest hover:bg-orange-700">New Onboarding</button>
         </div>
       </div>
     );
@@ -271,28 +243,16 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-4">
-      <div className="fixed bottom-6 right-6 z-50">
-        <button 
-          onClick={saveManually}
-          className={`px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl transition-all flex items-center gap-2 ${
-            isDraftSaved ? 'bg-green-600 text-white' : 'bg-gray-900 text-white hover:bg-black'
-          }`}
-        >
-          {isDraftSaved ? '✓ Saved Locally' : 'Save Session'}
-        </button>
-      </div>
-
       <header className="mb-12 text-center">
         <h1 className="text-7xl font-black text-gray-900 tracking-tighter mb-2 italic uppercase">FUME 2026</h1>
-        <p className="text-lg text-gray-500 font-bold uppercase tracking-[0.3em]">Vendor Onboarding Control</p>
+        <p className="text-lg text-gray-500 font-bold uppercase tracking-[0.3em]">Vendor Control Portal</p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-10">
-        {/* Section 1 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 1: Vendor Details" />
           <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField label="Vendor ID" required helper="Must match your pre-allocated ID" value={formData.vendorId} onChange={(v) => setFormData({...formData, vendorId: v})} />
+            <FormField label="Vendor ID" required helper="Matches your row on the master sheet" value={formData.vendorId} onChange={(v) => setFormData({...formData, vendorId: v})} />
             <FormField label="Trading Name" required value={formData.tradingName} onChange={(v) => setFormData({...formData, tradingName: v})} />
             <FormField label="Contact Name" required value={formData.contactName} onChange={(v) => setFormData({...formData, contactName: v})} />
             <FormField label="Email" type="email" required value={formData.email} onChange={(v) => setFormData({...formData, email: v})} />
@@ -303,20 +263,18 @@ const App: React.FC = () => {
                 <option value="">Select option...</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
-                <option value="Need More Info">Need More Info</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Section 2 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 2: Stand Design" />
           <div className="p-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-black text-gray-700 mb-2 uppercase">Van / Shack</label>
-                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 font-medium" value={formData.standType} onChange={(e) => setFormData({...formData, standType: e.target.value as any})} required>
+                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium" value={formData.standType} onChange={(e) => setFormData({...formData, standType: e.target.value as any})} required>
                   <option value="">Select...</option>
                   <option value="Van">Van</option>
                   <option value="Shack">Shack</option>
@@ -326,7 +284,7 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {['spaceLeft', 'spaceRight', 'spaceBehind'].map((field) => (
                 <div key={field}>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">{field.replace('space', 'Space ')}</label>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">{field === 'spaceLeft' ? 'Left' : field === 'spaceRight' ? 'Right' : 'Behind'}</label>
                   <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-medium" value={(formData as any)[field]} onChange={(e) => setFormData({...formData, [field]: e.target.value})}>
                     {SPACE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
@@ -334,10 +292,10 @@ const App: React.FC = () => {
               ))}
             </div>
             <div>
-              <label className="block text-sm font-black text-gray-700 mb-3 uppercase">Reason for Additional Space</label>
+              <label className="block text-sm font-black text-gray-700 mb-3 uppercase">Reason for External Space</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {REASON_OPTIONS.map((opt) => (
-                  <button key={opt} type="button" onClick={() => setFormData({...formData, externalSpaceReason: opt as ExternalSpaceReason})} className={`px-4 py-3 rounded-xl border-2 font-black transition-all text-xs uppercase ${formData.externalSpaceReason === opt ? 'border-orange-600 bg-orange-600 text-white shadow-lg' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'}`}>
+                  <button key={opt} type="button" onClick={() => setFormData({...formData, externalSpaceReason: opt as ExternalSpaceReason})} className={`px-4 py-3 rounded-xl border-2 font-black transition-all text-xs uppercase ${formData.externalSpaceReason === opt ? 'border-orange-600 bg-orange-600 text-white shadow-lg' : 'border-gray-200 bg-white text-gray-500'}`}>
                     {opt}
                   </button>
                 ))}
@@ -347,13 +305,12 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 3 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 3: Equipment and Power" />
           <div className="p-8 space-y-6">
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2 uppercase">Power Source</label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none font-medium" value={formData.powerSource} onChange={(e) => setFormData({...formData, powerSource: e.target.value as any})} required>
+              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none font-medium" value={formData.powerSource} onChange={(e) => setFormData({...formData, powerSource: e.target.value as any})} required>
                 <option value="">Select...</option>
                 <option value="FUME/Venue Supply">FUME/Venue Supply</option>
                 <option value="Own Generator">Own Generator</option>
@@ -362,7 +319,7 @@ const App: React.FC = () => {
             <div className="pt-6 border-t border-gray-100">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-black text-gray-800 uppercase italic">Stand Equipment</h3>
-                <button type="button" onClick={addEquipment} className="bg-orange-600 text-white text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-widest shadow-lg">+ Add Item</button>
+                <button type="button" onClick={addEquipment} className="bg-orange-600 text-white text-[10px] font-black px-5 py-2 rounded-full uppercase shadow-lg">+ Add Equipment</button>
               </div>
               <div className="space-y-3">
                 {formData.equipment.map((item, index) => (
@@ -389,11 +346,10 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 4 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 4: Paperwork" />
           <div className="p-8 space-y-8">
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-xl shadow-sm text-blue-800">
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-xl text-blue-800">
               <p className="text-xs font-black uppercase tracking-widest leading-relaxed">Deadline: 14th Feb 2026. Docs must be valid until June 14th 2026.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
@@ -404,7 +360,7 @@ const App: React.FC = () => {
                   }} />
                   <div className="flex flex-col">
                     <label className="text-[10px] uppercase font-black text-gray-400 mb-1 tracking-widest">Expiration</label>
-                    <input type="date" className={`w-full px-3 py-2 border rounded-lg transition text-sm font-bold ${formData.paperwork[item.id].expiry && !validateExpiry(formData.paperwork[item.id].expiry) ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} value={formData.paperwork[item.id].expiry} onChange={(e) => {
+                    <input type="date" className={`w-full px-3 py-2 border rounded-lg font-bold ${formData.paperwork[item.id].expiry && !validateExpiry(formData.paperwork[item.id].expiry) ? 'border-red-500' : 'border-gray-300'}`} value={formData.paperwork[item.id].expiry} onChange={(e) => {
                         const newPaperwork = { ...formData.paperwork }; newPaperwork[item.id].expiry = e.target.value; setFormData({...formData, paperwork: newPaperwork});
                       }} />
                   </div>
@@ -423,7 +379,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 5 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 5: Menu" />
           <div className="p-8 space-y-10">
@@ -444,7 +399,7 @@ const App: React.FC = () => {
                   <FormField label="Ingredients" value={(formData.menu as any)[d.key].ingredients} onChange={(v) => {
                     const newMenu = { ...formData.menu }; (newMenu as any)[d.key].ingredients = v; setFormData({...formData, menu: newMenu});
                   }} />
-                  <FileInput label="Photo" accept="image/*" onChange={(f) => {
+                  <FileInput label="Photo Upload" accept="image/*" onChange={(f) => {
                     const newMenu = { ...formData.menu }; (newMenu as any)[d.key].photo = f; setFormData({...formData, menu: newMenu});
                   }} />
                 </div>
@@ -453,13 +408,12 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 6 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 6: Staffing" />
           <div className="p-8 space-y-6">
-            <div className="bg-gray-950 text-white p-5 rounded-2xl text-[10px] uppercase font-black tracking-widest text-center italic">Min 6 staff required for show days.</div>
+            <div className="bg-gray-950 text-white p-5 rounded-2xl text-[10px] uppercase font-black tracking-widest text-center italic">Min 6 staff required.</div>
             <div className="flex justify-between items-center">
-              <h3 className="font-black text-gray-800 uppercase italic">Staff allocation ({formData.staff.length}/6)</h3>
+              <h3 className="font-black text-gray-800 uppercase italic">Staff Allocation ({formData.staff.length}/6)</h3>
               <button type="button" onClick={addStaff} className="bg-black text-white text-[10px] font-black px-6 py-2.5 rounded-full uppercase hover:scale-105 transition-transform">+ Add Staff</button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -478,7 +432,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 7 */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 7: Final Details" />
           <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -493,12 +446,10 @@ const App: React.FC = () => {
 
         <div className="space-y-4 pt-6">
           <button type="submit" disabled={isSubmitting || formData.staff.length < MIN_STAFF_COUNT} className={`w-full py-8 rounded-[40px] text-3xl font-black text-white shadow-2xl transition-all uppercase tracking-tighter italic ${isSubmitting || formData.staff.length < MIN_STAFF_COUNT ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 active:scale-[0.98]'}`}>
-            {isSubmitting ? 'UPLOADING...' : 'FINISH ONBOARDING'}
+            {isSubmitting ? 'SYNCING...' : 'FINISH ONBOARDING'}
           </button>
         </div>
       </form>
-
-      <footer className="mt-24 py-12 border-t border-gray-200 text-center text-gray-400 text-[9px] font-black uppercase italic tracking-[0.4em]">&copy; 2026 FUME Festival</footer>
     </div>
   );
 };
