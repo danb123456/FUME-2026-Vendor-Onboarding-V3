@@ -1,11 +1,11 @@
 
 export const EQUIPMENT_TYPES = [
   "Lights", "Van", "Till/POS", "Smoker", "Hot Hold", "Oven", 
-  "Fridge", "Freezer", "Baine Marie", "Asado", "Other (Hot)", 
+  "Fridge", "Freezer", "Baine Marie", "Asado", "Fryer", "Other (Hot)", 
   "Other (aesthetic)", "Other (cold)", "Other (misc)"
 ];
 
-export const POWER_SOCKETS = ["n/a", "13a", "16a", "32a"];
+export const POWER_SOCKETS = ["n/a", "13a", "16a", "32a", "Gas", "Wood", "Coal"];
 
 export const STAFF_ROLES = ["Chef", "Pitmaster", "Manager", "Server", "Cleaner", "Driver", "Other"];
 
