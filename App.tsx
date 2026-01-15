@@ -209,7 +209,7 @@ const App: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <h1 className="text-3xl font-black text-gray-800 text-center mb-8 uppercase italic tracking-tighter">FUME 2026</h1>
         <form onSubmit={handleAuth} className="space-y-4">
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-orange-500" placeholder="Password: FUME2026" required />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-orange-500" placeholder="Password" required />
           {authError && <p className="text-red-500 text-sm font-bold text-center">{authError}</p>}
           <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-lg shadow-lg uppercase tracking-widest hover:bg-orange-700 transition-colors">Login</button>
         </form>
@@ -338,7 +338,6 @@ const App: React.FC = () => {
             <div className={`p-4 rounded-xl font-black text-xs uppercase tracking-widest leading-relaxed shadow-inner ${formData.comingToStateFayre === 'Yes' ? 'bg-orange-50 text-orange-800 border-l-4 border-orange-500' : 'bg-blue-50 text-blue-800 border-l-4 border-blue-500'}`}>
               REQUIRED UNTIL: {formData.comingToStateFayre === 'Yes' ? '1st July 2026' : '14th June 2026'}. <br/>
               Deadline: 14th Feb 2026. Documents must be designed for Allianz Stadium/State Fayre for relevant dates.
-              Deadline: 14th Feb 2026. Docs must be designed for Allianz Stadium/State Fayre.
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10">
               {PAPERWORK_ITEMS.map((item) => (
@@ -423,7 +422,6 @@ const App: React.FC = () => {
             <FormField label="Vehicle Registration Number" value={formData.vehicleReg} onChange={(v) => setFormData({...formData, vehicleReg: v})} required />
             <FormField label="Instagram Handle" value={formData.instagram} onChange={(v) => setFormData({...formData, instagram: v})} placeholder="@handle" />
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Questions / Comments *MUST INCLUDE ACCOMMODATION ADDRESS HERE*</label>
               <label className="block text-sm font-black text-gray-700 mb-2 uppercase italic">Questions / Comments *Must State Address for Live Days*</label>
               <textarea rows={3} className="w-full px-4 py-3 border border-gray-300 rounded-2xl outline-none font-medium focus:ring-2 focus:ring-orange-500" value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})} />
             </div>
