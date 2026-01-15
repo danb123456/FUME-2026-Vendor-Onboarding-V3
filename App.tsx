@@ -1,4 +1,4 @@
-
+er
 import React, { useState, useEffect } from 'react';
 import { 
   VendorFormData, 
@@ -210,7 +210,7 @@ const App: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <h1 className="text-3xl font-black text-gray-800 text-center mb-8 uppercase italic tracking-tighter">FUME 2026</h1>
         <form onSubmit={handleAuth} className="space-y-4">
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-orange-500" placeholder="Password: FUME2026" required />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 outline-none focus:ring-2 focus:ring-orange-500" placeholder="Enter Password" required />
           {authError && <p className="text-red-500 text-sm font-bold text-center">{authError}</p>}
           <button type="submit" className="w-full bg-orange-600 text-white font-black py-4 rounded-lg shadow-lg uppercase tracking-widest hover:bg-orange-700 transition-colors">Login</button>
         </form>
