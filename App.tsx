@@ -1,4 +1,4 @@
-er
+
 import React, { useState, useEffect } from 'react';
 import { 
   VendorFormData, 
@@ -20,7 +20,7 @@ import {
 } from './constants';
 import SectionHeader from './components/SectionHeader';
 import FormField from './components/FormField';
-import FileInput from './components/FileInput';
+
 
 // REPLACE THIS WITH YOUR NEW DEPLOYMENT URL
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAepbh5GuZmV-OaGWS1L1ZHiNScYRQobKhy0M0RXW09uleqqsaRGgG4omNZRYiDvE/exec';
