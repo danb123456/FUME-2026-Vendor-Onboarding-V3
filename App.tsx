@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   VendorFormData, 
   EquipmentItem, 
   StaffMember, 
   PaperworkFile,
-  ExternalSpaceReason
+  ExternalSpaceReason,
+  StateFayreMenuItem
 } from './types';
 import { 
   EQUIPMENT_TYPES, 
@@ -57,6 +59,7 @@ const App: React.FC = () => {
       dish75: { desc: '', ingredients: '', photo: null },
       dish15: { desc: '', ingredients: '', photo: null }
     },
+    stateFayreMenu: [],
     staff: [],
     vehicleReg: '',
     instagram: '',
@@ -71,7 +74,6 @@ const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // We restore everything except files which can't be serialized to string easily this way
         setFormData(prev => ({ ...prev, ...parsed }));
         if (parsed.externalSpaceReason) {
           setSelectedReasons(parsed.externalSpaceReason.split(', '));
@@ -82,13 +84,12 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Save draft on change (de-duplicate file objects for serialization)
+  // Save draft on change
   useEffect(() => {
     const { branding, paperwork, menu, ...serializable } = formData;
     const saveObj = {
       ...serializable,
       externalSpaceReason: selectedReasons.join(', '),
-      // Store dates but null out files in the saved state
       paperwork: Object.keys(paperwork).reduce((acc, key) => {
         acc[key] = { ...paperwork[key], file: null };
         return acc;
@@ -161,6 +162,7 @@ const App: React.FC = () => {
         menuDesc3: `${formData.menu.dish3.desc} (${formData.menu.dish3.ingredients})`,
         menuDesc75: `${formData.menu.dish75.desc} (${formData.menu.dish75.ingredients})`,
         menuDesc15: `${formData.menu.dish15.desc} (${formData.menu.dish15.ingredients})`,
+        stateFayreMenu: formData.stateFayreMenu.map(m => `[${m.price}] ${m.description} (Portion: ${m.portionPlan})`).join(' | '),
         vehicleReg: formData.vehicleReg,
         instagram: formData.instagram,
         comments: formData.comments,
@@ -202,6 +204,27 @@ const App: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const addStateFayreMenuItem = () => {
+    const newItem: StateFayreMenuItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      price: '',
+      description: '',
+      portionPlan: ''
+    };
+    setFormData({ ...formData, stateFayreMenu: [...formData.stateFayreMenu, newItem] });
+  };
+
+  const updateStateFayreMenuItem = (id: string, field: keyof StateFayreMenuItem, value: string) => {
+    const newMenu = formData.stateFayreMenu.map(item => 
+      item.id === id ? { ...item, [field]: value } : item
+    );
+    setFormData({ ...formData, stateFayreMenu: newMenu });
+  };
+
+  const removeStateFayreMenuItem = (id: string) => {
+    setFormData({ ...formData, stateFayreMenu: formData.stateFayreMenu.filter(item => item.id !== id) });
   };
 
   if (!isAuthenticated) return (
@@ -255,6 +278,24 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* State Fayre Conditional Info Box */}
+        {(formData.comingToStateFayre === 'Yes' || formData.comingToStateFayre === 'Need More Info') && (
+          <div className="bg-orange-50 border-2 border-orange-200 p-8 rounded-3xl shadow-inner animate-in fade-in slide-in-from-top-4 duration-500">
+            <h3 className="text-orange-800 font-black text-xl mb-4 uppercase italic italic tracking-tight">Important: State Fayre Information</h3>
+            <p className="text-sm font-bold text-orange-900 leading-relaxed uppercase italic">
+              State Fayre is a Live Nation run Country Music event held in Chelmsford. 
+              <span className="block mt-3 text-orange-700 underline underline-offset-4 decoration-orange-400">DATES - Load in 24/25th JUNE, Live 26th to 28th JUNE.</span>
+              Current footfall projections are 50-70,000 people across the weekend. FUME is going to be ~1/2 of the whole food offering and we are very excited by this. 
+              <span className="block mt-4 bg-orange-100 p-4 rounded-xl border border-orange-200">
+                IMPORTANT - The Commission Fee is 25% and there are recharges for power set by Live Nation. 
+              </span>
+              <span className="block mt-3 text-[10px] text-orange-600 font-black tracking-widest">
+                NOTE - These are State Fayre specific, not relevant for FUME Twickenham.
+              </span>
+            </p>
+          </div>
+        )}
 
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 2: Stand Design" />
@@ -390,6 +431,70 @@ const App: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* State Fayre Specific Menu Section */}
+        {formData.comingToStateFayre === 'Yes' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <SectionHeader title="Section 5b: MENU - STATE FAYRE SPECIFIC" />
+            <div className="p-8 space-y-6">
+              <div className="bg-slate-900 text-white p-6 rounded-2xl border-l-4 border-orange-500 shadow-md">
+                <p className="text-sm font-bold uppercase italic tracking-wide leading-relaxed">
+                  You have freedom of pricing and menu items, but please be aware that ~20,000 people will be coming via the FUME PIT each day. We recommend keeping the menu streamlined to help with quality and speed of service.
+                </p>
+              </div>
+
+              <div className="flex justify-between items-center py-4">
+                <h3 className="font-black text-gray-800 uppercase italic tracking-tight">Custom State Fayre Items</h3>
+                <button 
+                  type="button" 
+                  onClick={addStateFayreMenuItem}
+                  className="bg-orange-600 text-white text-[10px] font-black px-6 py-2.5 rounded-full shadow-lg hover:scale-105 transition-all uppercase tracking-widest"
+                >
+                  + Add Item
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {formData.stateFayreMenu.length === 0 && (
+                  <div className="text-center py-8 border-2 border-dashed border-gray-100 rounded-3xl">
+                    <p className="text-gray-400 font-bold uppercase italic text-xs">No items added yet. Click "+ Add Item" above.</p>
+                  </div>
+                )}
+                {formData.stateFayreMenu.map((item, idx) => (
+                  <div key={item.id} className="bg-gray-50 border border-gray-200 p-6 rounded-3xl relative group transition-all hover:border-orange-200">
+                    <button 
+                      type="button" 
+                      onClick={() => removeStateFayreMenuItem(item.id)}
+                      className="absolute top-4 right-4 text-red-500 font-black hover:scale-125 transition-transform"
+                    >
+                      ✕
+                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <FormField 
+                        label="Price" 
+                        value={item.price} 
+                        placeholder="e.g. £12.00"
+                        onChange={(v) => updateStateFayreMenuItem(item.id, 'price', v)} 
+                      />
+                      <FormField 
+                        label="Item Description" 
+                        value={item.description} 
+                        placeholder="Dish name and details..."
+                        onChange={(v) => updateStateFayreMenuItem(item.id, 'description', v)} 
+                      />
+                      <FormField 
+                        label="Portion Plan" 
+                        value={item.portionPlan} 
+                        placeholder="e.g. 350g serving size"
+                        onChange={(v) => updateStateFayreMenuItem(item.id, 'portionPlan', v)} 
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <SectionHeader title="Section 6: Staffing" />
