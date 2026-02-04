@@ -23,8 +23,8 @@ import SectionHeader from './components/SectionHeader';
 import FormField from './components/FormField';
 import FileInput from './components/FileInput';
 
-// REPLACE THIS WITH YOUR NEW DEPLOYMENT URL
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyrlweXAjIwDdOThB7EYYrdhwaVIvm3fU_GoJXxgJPwjug2cetNlUPf0qp24oDe_4/exec';
+// IMPORTANT: Replace this with your newly generated Google Apps Script URL
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRV9G7y6H0S2uOim8TenCZrLuu3WsUYuodrqtArqgE9nNU999MQD9zf9lokDv7kQw/exec';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -68,7 +68,6 @@ const App: React.FC = () => {
 
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
 
-  // Load draft on mount
   useEffect(() => {
     const saved = localStorage.getItem('fume_vendor_draft');
     if (saved) {
@@ -84,7 +83,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Save draft on change
   useEffect(() => {
     const { branding, paperwork, menu, ...serializable } = formData;
     const saveObj = {
@@ -279,16 +277,16 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* State Fayre Conditional Info Box */}
+        {/* State Fayre Conditional Info Box - Now between Section 1 and 2 */}
         {(formData.comingToStateFayre === 'Yes' || formData.comingToStateFayre === 'Need More Info') && (
           <div className="bg-orange-50 border-2 border-orange-200 p-8 rounded-3xl shadow-inner animate-in fade-in slide-in-from-top-4 duration-500">
-            <h3 className="text-orange-800 font-black text-xl mb-4 uppercase italic italic tracking-tight">Important: State Fayre Information</h3>
+            <h3 className="text-orange-800 font-black text-xl mb-4 uppercase italic tracking-tight">Important: State Fayre Information</h3>
             <p className="text-sm font-bold text-orange-900 leading-relaxed uppercase italic">
               State Fayre is a Live Nation run Country Music event held in Chelmsford. 
               <span className="block mt-3 text-orange-700 underline underline-offset-4 decoration-orange-400">DATES - Load in 24/25th JUNE, Live 26th to 28th JUNE.</span>
               Current footfall projections are 50-70,000 people across the weekend. FUME is going to be ~1/2 of the whole food offering and we are very excited by this. 
               <span className="block mt-4 bg-orange-100 p-4 rounded-xl border border-orange-200">
-                IMPORTANT - The Commission Fee is 25% and there are recharges for power set by Live Nation. 
+                IMPORTANT - The Commission Fee is 25% and there are recharges for power (~£400 for 16a single phase to ~£1500 for 63a single phase, 3 phase more expensive). 
               </span>
               <span className="block mt-3 text-[10px] text-orange-600 font-black tracking-widest">
                 NOTE - These are State Fayre specific, not relevant for FUME Twickenham.
@@ -432,10 +430,10 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* State Fayre Specific Menu Section */}
+        {/* State Fayre Specific Menu Section - Now with refined Title and Description */}
         {formData.comingToStateFayre === 'Yes' && (
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <SectionHeader title="Section 5b: MENU - STATE FAYRE SPECIFIC" />
+            <SectionHeader title="MENU - STATE FAYRE SPECIFIC" />
             <div className="p-8 space-y-6">
               <div className="bg-slate-900 text-white p-6 rounded-2xl border-l-4 border-orange-500 shadow-md">
                 <p className="text-sm font-bold uppercase italic tracking-wide leading-relaxed">
