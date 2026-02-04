@@ -18,6 +18,13 @@ export type PaperworkFile = {
 
 export type ExternalSpaceReason = "Smoker" | "Fridge/Fridge Van" | "Food Truck" | "Asado Grill" | "Service Counter" | "Other" | "";
 
+export type StateFayreMenuItem = {
+  id: string;
+  price: string;
+  description: string;
+  portionPlan: string;
+};
+
 export interface VendorFormData {
   vendorId: string;
   tradingName: string;
@@ -40,6 +47,7 @@ export interface VendorFormData {
     dish75: { desc: string; ingredients: string; photo: File | null };
     dish15: { desc: string; ingredients: string; photo: File | null };
   };
+  stateFayreMenu: StateFayreMenuItem[];
   staff: StaffMember[];
   vehicleReg: string;
   instagram: string;
